@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"dagger/workshop/internal/dagger"
 )
 
@@ -11,13 +12,32 @@ func (m *Workshop) Build(
 	source *dagger.Directory,
 ) *dagger.File {
 	return dag.Go().
-		Build(source)
+		Build(source, dagger.GoBuildOpts{
+			Trimpath: true,
+			Platform: dagger.Platform("linux/amd64"),
+		})
 	// 	return dag.Container().
 	// 		From("golang").
 	// 		WithWorkdir("/work").
 	// 		WithDirectory(".", source).
 	// 		WithExec([]string{"go", "build", "-o", "app"}).
 	// 		File("/work/app")
+}
+
+func (m *Workshop) Publish(
+	ctx context.Context,
+	// +defaultPath=/
+	source *dagger.Directory,
+) error {
+	ctr := dag.Container().
+		From("alpine").
+		WithFile("/usr/local/bin/app", m.Build(source))
+
+	_, err := ctr.Publish(ctx, "ttl.sh/workshop-dagger:1h")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *Workshop) Lint(
